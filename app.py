@@ -1,14 +1,24 @@
 import os
 import threading
+import sys
 from flask import Flask, jsonify
 from bot import run_bot
 
 app = Flask(__name__)
 
 def start_bot():
-    run_bot()
+    try:
+        print("Поток бота запущен. Вызываю run_bot()...", flush=True)
+        run_bot()
+    except Exception as e:
+        print(f"КРИТИЧЕСКАЯ ОШИБКА В БОТЕ: {e}", flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stdout)
 
-threading.Thread(target=start_bot).start()
+thread = threading.Thread(target=start_bot)
+thread.daemon = True  # чтобы поток завершился при остановке Flask
+thread.start()
+print("Поток бота создан", flush=True)
 
 @app.route('/')
 def home():

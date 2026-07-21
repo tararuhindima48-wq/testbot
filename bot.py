@@ -4,6 +4,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import code_generator
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
+if not TOKEN:
+    raise ValueError("TELEGRAM_TOKEN не установлен!")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -27,5 +29,5 @@ def run_bot():
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("Бот запущен и работает в режиме polling...")
+    print("🤖 Бот запущен, начинаю polling...", flush=True)
     app.run_polling()
