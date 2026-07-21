@@ -1,33 +1,38 @@
 import os
+import requests
+from flask import Flask, request, jsonify
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import code_generator
+from bot import application
 
+app = Flask(__name__)
+
+# Устанавливаем вебхук при старте
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TOKEN:
-    raise ValueError("TELEGRAM_TOKEN не установлен!")
+    raise ValueError("TELEGRAM_TOKEN не установлен")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👾 Привет! Я нейросеть для генерации идеального кода.\n"
-        "Пришли мне описание задачи, и я сгенерирую код.\n"
-        "Например: 'напиши функцию быстрой сортировки на Python'"
-    )
+WEBHOOK_URL = os.environ.get("RENDER_EXTERNAL_URL") + "/webhook"
+# Если RENDER_EXTERNAL_URL нет (локально), используем ngrok или localhost
+if not WEBHOOK_URL or "localhost" in WEBHOOK_URL:
+    WEBHOOK_URL = "https://your-ngrok-url.ngrok.io/webhook"  # для локального теста
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    prompt = update.message.text
-    await update.message.reply_text("⏳ Генерирую код через API...")
-    try:
-        code = code_generator.generate_code(prompt, max_length=600)
-        if len(code) > 4000:
-            code = code[:4000] + "\n... (обрезано)"
-        await update.message.reply_text(f"```\n{code}\n```", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+def set_webhook():
+    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
+    response = requests.post(url, json={"url": WEBHOOK_URL})
+    print(f"Webhook set: {response.json()}")
 
-def run_bot():
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("🤖 Бот запущен, начинаю polling...", flush=True)
-    app.run_polling()
+set_webhook()
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(), application.bot)
+    application.process_update(update)
+    return jsonify({"status": "ok"})
+
+@app.route("/")
+def home():
+    return jsonify({"status": "Bot is running with webhook!"})
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
